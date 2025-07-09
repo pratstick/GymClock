@@ -20,7 +20,7 @@ class GymClockRepository(private val dao: GymClockDao) {
     suspend fun insertExercise(exercise: ExerciseEntity) = dao.insertExercise(exercise)
 
     // Workout operations
-    fun getWorkoutsForDay(day: String): Flow<List<WorkoutWithExercise>> = dao.getWorkoutsWithExerciseForDay(day)
+    fun getWorkoutsForDay(day: String): Flow<List<WorkoutWithExercise>> = dao.getWorkoutsWithExerciseForDay(day.lowercase())
     suspend fun insertWorkout(workout: WorkoutEntity) = dao.insertWorkout(workout)
     suspend fun updateWorkout(workout: WorkoutEntity) = dao.updateWorkout(workout)
     suspend fun deleteWorkout(workout: WorkoutEntity) = dao.deleteWorkout(workout)
@@ -78,7 +78,33 @@ class GymClockRepository(private val dao: GymClockDao) {
             ExerciseEntity(name = "Burpees", category = "Full Body", muscleGroup = "Full Body", isBodyweight = true),
             ExerciseEntity(name = "Mountain Climbers", category = "Full Body", muscleGroup = "Full Body", isBodyweight = true),
             ExerciseEntity(name = "Planks", category = "Core", muscleGroup = "Core", isBodyweight = true),
-            ExerciseEntity(name = "Russian Twists", category = "Core", muscleGroup = "Core", isBodyweight = true)
+            ExerciseEntity(name = "Russian Twists", category = "Core", muscleGroup = "Core", isBodyweight = true),
+
+            // Arms
+            ExerciseEntity(name = "Tricep Pushdown", category = "Push", muscleGroup = "Triceps"),
+            ExerciseEntity(name = "Skullcrushers", category = "Push", muscleGroup = "Triceps"),
+            ExerciseEntity(name = "Preacher Curl", category = "Pull", muscleGroup = "Biceps"),
+            ExerciseEntity(name = "Concentration Curl", category = "Pull", muscleGroup = "Biceps"),
+            ExerciseEntity(name = "Cable Curl", category = "Pull", muscleGroup = "Biceps"),
+            ExerciseEntity(name = "Reverse Curl", category = "Pull", muscleGroup = "Forearms"),
+            ExerciseEntity(name = "Wrist Curl", category = "Pull", muscleGroup = "Forearms"),
+
+            // Core
+            ExerciseEntity(name = "Crunches", category = "Core", muscleGroup = "Abs", isBodyweight = true),
+            ExerciseEntity(name = "Hanging Leg Raise", category = "Core", muscleGroup = "Abs", isBodyweight = true),
+            ExerciseEntity(name = "Cable Crunch", category = "Core", muscleGroup = "Abs"),
+            ExerciseEntity(name = "Ab Wheel Rollout", category = "Core", muscleGroup = "Abs"),
+            ExerciseEntity(name = "Bicycle Crunch", category = "Core", muscleGroup = "Abs", isBodyweight = true),
+
+            // Machines/Other
+            ExerciseEntity(name = "Seated Row Machine", category = "Pull", muscleGroup = "Back"),
+            ExerciseEntity(name = "Chest Fly Machine", category = "Push", muscleGroup = "Chest"),
+            ExerciseEntity(name = "Leg Adduction Machine", category = "Legs", muscleGroup = "Adductors"),
+            ExerciseEntity(name = "Leg Abduction Machine", category = "Legs", muscleGroup = "Abductors"),
+            ExerciseEntity(name = "Smith Machine Squat", category = "Legs", muscleGroup = "Quadriceps"),
+            ExerciseEntity(name = "Hack Squat", category = "Legs", muscleGroup = "Quadriceps"),
+            ExerciseEntity(name = "Hip Thrust", category = "Legs", muscleGroup = "Glutes"),
+            ExerciseEntity(name = "Glute Bridge", category = "Legs", muscleGroup = "Glutes", isBodyweight = true)
         )
         dao.insertExercises(exercises)
     }
@@ -181,5 +207,65 @@ class GymClockRepository(private val dao: GymClockDao) {
                 }
             }
         }
+    }
+
+    suspend fun getExerciseByName(name: String): ExerciseEntity? = dao.getExerciseByName(name)
+
+    suspend fun applySplit(splitId: String) {
+        // 1. Get all split templates for this split
+        val templates = dao.getSplitTemplate(splitId).first()
+        android.util.Log.d("GymClockRepository", "applySplit: templates size = ${templates.size}")
+        if (templates.isEmpty()) {
+            android.util.Log.w("GymClockRepository", "applySplit: No templates found for splitId = $splitId")
+            return
+        }
+        // 2. Delete all existing workouts for the week
+        val daysOfWeek = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+        for (day in daysOfWeek) {
+            val workouts = dao.getWorkoutsWithExerciseForDay(day).first()
+            for (workout in workouts) {
+                dao.deleteWorkout(WorkoutEntity(
+                    id = workout.id,
+                    day = workout.day,
+                    exerciseId = workout.exerciseId,
+                    sets = workout.sets,
+                    reps = workout.reps,
+                    weight = workout.weight,
+                    restTimeSeconds = workout.restTimeSeconds,
+                    isCompleted = workout.isCompleted,
+                    orderInWorkout = workout.orderInWorkout,
+                    notes = workout.notes,
+                    completedAt = workout.completedAt
+                ))
+            }
+        }
+        // 3. For each template, find the exercise and insert a new workout for the correct day
+        var insertedCount = 0
+        for (template in templates) {
+            val exercise = getExerciseByName(template.exerciseName)
+            if (exercise != null) {
+                val day = template.day
+                val sets = template.sets.toIntOrNull() ?: 3
+                val reps = template.reps.split('-').firstOrNull()?.toIntOrNull() ?: 10
+                val workout = WorkoutEntity(
+                    id = 0L,
+                    day = day,
+                    exerciseId = exercise.id,
+                    sets = sets,
+                    reps = reps,
+                    weight = if (exercise.isBodyweight == true) 0f else 50f,
+                    restTimeSeconds = template.restTime,
+                    isCompleted = false,
+                    orderInWorkout = template.orderInDay,
+                    notes = null,
+                    completedAt = null
+                )
+                dao.insertWorkout(workout)
+                insertedCount++
+            } else {
+                android.util.Log.w("GymClockRepository", "applySplit: Exercise not found for name = ${template.exerciseName}")
+            }
+        }
+        android.util.Log.d("GymClockRepository", "applySplit: Inserted $insertedCount workouts for splitId = $splitId")
     }
 }

@@ -23,6 +23,8 @@ fun SplitsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showApplyDialog by remember { mutableStateOf<PredefinedSplitEntity?>(null) }
+    var showSnackbar by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -66,6 +68,14 @@ fun SplitsScreen(
         }
     }
 
+    // Show snackbar message if exists
+    if (showSnackbar != null) {
+        LaunchedEffect(showSnackbar) {
+            snackbarHostState.showSnackbar(showSnackbar!!)
+            showSnackbar = null
+        }
+    }
+
     // Apply Split Dialog
     showApplyDialog?.let { split ->
         AlertDialog(
@@ -86,6 +96,7 @@ fun SplitsScreen(
                     onClick = {
                         viewModel.applySplit(split.id)
                         showApplyDialog = null
+                        showSnackbar = "Split applied!"
                     }
                 ) {
                     Text("Apply Split")

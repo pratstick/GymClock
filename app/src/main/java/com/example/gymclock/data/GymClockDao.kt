@@ -57,6 +57,9 @@ interface GymClockDao {
     @Delete
     suspend fun deleteWorkout(workout: WorkoutEntity)
 
+    @Query("DELETE FROM workout WHERE day = :day")
+    suspend fun deleteWorkoutsForDay(day: String)
+
     // Workout Log
     @Query("SELECT * FROM workout_log WHERE exerciseId = :exerciseId ORDER BY completedAt DESC")
     fun getWorkoutLogsForExercise(exerciseId: Long): Flow<List<WorkoutLogEntity>>
@@ -79,6 +82,12 @@ interface GymClockDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSplitTemplates(templates: List<SplitTemplateEntity>)
+
+    @Query("SELECT id FROM exercise WHERE name = :name LIMIT 1")
+    suspend fun getExerciseIdByName(name: String): Long?
+
+    @Query("SELECT * FROM exercise WHERE name = :name LIMIT 1")
+    suspend fun getExerciseByName(name: String): ExerciseEntity?
 }
 
 data class WorkoutWithExercise(
