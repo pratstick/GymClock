@@ -1,0 +1,98 @@
+Here's a structured LLM-friendly prompt template for developing **GymClock**, optimized for technical implementation and iterative refinement:
+
+---
+
+### **Project Definition**  
+**Objective:**  
+*Build a Kotlin/Jetpack Compose Android app (min SDK 26) for workout timing and planning with:  
+1. Custom rest timers  
+2. Predefined splits (sourced from The Fitness Wiki)  
+3. Progress tracking*  
+
+**Constraints:**  
+- Offline-first (Room DB)  
+- Material 3 design  
+- 100% free with optional premium later  
+
+---
+
+### **Modular Task Breakdown** *(Prioritized for LLM Execution)*  
+
+#### **1. Core Timer Function**  
+```kotlin  
+// INPUT: Rest duration (seconds), vibration on/off  
+// OUTPUT: Countdown with circular progress indicator  
+@Composable  
+fun RestTimer(seconds: Int, onFinish: () -> Unit) {  
+    // Implement using LaunchedEffect and rememberSaveable  
+    // Play sound/vibration on finish (use Android’s Vibrator)  
+}  
+```  
+**LLM Instructions:**  
+- "Provide Kotlin code for a Jetpack Compose countdown timer with progress ring animation"  
+- "How to trigger vibration when timer completes in modern Android?"  
+
+#### **2. Exercise Database**  
+```markdown  
+| Column       | Type        |  
+|--------------|-------------|  
+| id           | PRIMARY KEY |  
+| name         | TEXT        |  
+| muscle_group | TEXT (enum) |  
+| is_bodyweight| BOOLEAN     |  
+```  
+**LLM Instructions:**  
+- "Generate Room Entity for exercises with sample JSON for 5 basic lifts"  
+- "Best practice for seeding prepopulated database in Android Room"  
+
+#### **3. Workout Planner UI**  
+```kotlin  
+// INPUT: Selected routine (PPL/5x5)  
+// OUTPUT: Editable list of exercises with sets/reps  
+@Composable  
+fun ExerciseEditor(split: Split) {  
+    // LazyColumn with expandable cards per exercise  
+    // Each card has +/– controls for sets and reps  
+}  
+```  
+**LLM Instructions:**  
+- "Show Jetpack Compose implementation for a draggable exercise list"  
+- "How to make an animated set/rep counter with increment buttons?"  
+
+---
+
+### **Optimization Queries** *(For Performance/UX)*  
+1. "Most efficient way to manage multiple concurrent timers in Android?"  
+2. "Minimum Room DB schema for tracking workout history with PRs"  
+3. "Best composable architecture for a tabbed workout planner (Today/Weekly/History)"  
+
+---
+
+### **Error Handling Cases**  
+```kotlin  
+// When parsing Fitness Wiki routines:  
+sealed class RoutineImportResult {  
+    data object Success : RoutineImportResult()  
+    data class Error(val message: String) : RoutineImportResult()  
+    data class PartialSuccess(val failedExercises: List<String>) : RoutineImportResult()  
+}  
+```  
+**LLM Instruction:**  
+- "Implement a type-safe routine importer with error recovery"  
+
+---
+
+### **Iteration Protocol**  
+For each module:  
+1. Request base implementation  
+2. Ask for edge case handling  
+3. Optimize for performance  
+4. Request Material 3 theming  
+
+**Example:**  
+- "Now add haptic feedback to the timer with adjustable intensity"  
+- "Make the exercise cards respond to swipe-to-delete with undo snackbar"  
+
+---
+
+Would you like me to generate any of these code snippets immediately or adjust the modularity further?
