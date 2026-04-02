@@ -85,7 +85,9 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
         val normDay = normalizeDay(day)
         viewModelScope.launch {
             // Use the target day's workout count for ordering, not today's count.
-            val orderInWorkout = repository.getWorkoutsForDay(normDay).first().size
+            // firstOrNull() is used instead of first() to avoid an indefinite suspend
+            // if the Flow never emits (e.g., on a DB error).
+            val orderInWorkout = repository.getWorkoutsForDay(normDay).firstOrNull()?.size ?: 0
             val workout = WorkoutEntity(
                 exerciseId = exerciseId,
                 day = normDay,
@@ -200,7 +202,9 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
         viewModelScope.launch {
             val exerciseId = repository.insertExercise(exercise)
             // Use the target day's workout count for ordering, not today's count.
-            val orderInWorkout = repository.getWorkoutsForDay(normDay).first().size
+            // firstOrNull() is used instead of first() to avoid an indefinite suspend
+            // if the Flow never emits (e.g., on a DB error).
+            val orderInWorkout = repository.getWorkoutsForDay(normDay).firstOrNull()?.size ?: 0
             val workout = WorkoutEntity(
                 exerciseId = exerciseId,
                 day = normDay,
@@ -224,7 +228,16 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
     }
 }
 
-/** Factory that lets [ViewModelProvider] construct [MainViewModel] with its dependency. */
+/**
+ * [ViewModelProvider.Factory] for [MainViewModel].
+ *
+ * Using a factory (rather than constructing the ViewModel directly in onCreate)
+ * allows [ViewModelProvider] to scope the instance to the Activity lifecycle so
+ * it survives configuration changes such as screen rotation, and to re-use any
+ * existing instance across recompositions.
+ *
+ * @param repository The single [GymClockRepository] to inject into the ViewModel.
+ */
 class MainViewModelFactory(private val repository: GymClockRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {

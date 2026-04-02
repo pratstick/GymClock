@@ -23,6 +23,12 @@ class WorkoutTimer(private val scope: CoroutineScope) {
     private var timerJob: Job? = null
     private var onTimerFinished: (() -> Unit)? = null
 
+    companion object {
+        /** Fallback sleep when the computed sleep duration is ≤ 0ms (e.g. the deadline
+         *  is already past by the time we compute it).  Keeps the loop from spinning. */
+        private const val FALLBACK_SLEEP_MS = 100L
+    }
+
     fun startTimer(seconds: Int, onFinished: (() -> Unit)? = null) {
         timerJob?.cancel()
         onTimerFinished = onFinished
@@ -99,7 +105,7 @@ class WorkoutTimer(private val scope: CoroutineScope) {
             _state.value = _state.value.copy(currentSeconds = remaining)
             // Sleep until the next whole-second boundary.
             val sleepMs = (endTime - System.currentTimeMillis()) % 1000L
-            delay(if (sleepMs > 0) sleepMs else 100L)
+            delay(if (sleepMs > 0) sleepMs else FALLBACK_SLEEP_MS)
         }
         _state.value = _state.value.copy(
             currentSeconds = 0,

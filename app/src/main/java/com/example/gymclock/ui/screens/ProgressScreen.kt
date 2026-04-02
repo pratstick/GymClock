@@ -105,6 +105,9 @@ private fun WorkoutLogCard(
     log: WorkoutLogEntity,
     exerciseName: String
 ) {
+    // SimpleDateFormat is not thread-safe in general, but Compose runs all
+    // recompositions on the main thread, so a single remembered instance per
+    // composition site is safe here.
     val dateFormat = remember { SimpleDateFormat("EEE, MMM d 'at' h:mm a", Locale.getDefault()) }
     val formattedDate = remember(log.completedAt) {
         dateFormat.format(Date(log.completedAt))
