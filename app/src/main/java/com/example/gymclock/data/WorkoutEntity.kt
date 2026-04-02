@@ -1,8 +1,9 @@
 package com.example.gymclock.data
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import androidx.room.ForeignKey
+import androidx.room.Index
+import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "workout",
@@ -13,6 +14,12 @@ import androidx.room.ForeignKey
             childColumns = ["exerciseId"],
             onDelete = ForeignKey.CASCADE
         )
+    ],
+    // Index on exerciseId satisfies Room's FK index requirement; index on day
+    // speeds up the per-day queries that power every screen in the app.
+    indices = [
+        Index(value = ["exerciseId"]),
+        Index(value = ["day"])
     ]
 )
 data class WorkoutEntity(

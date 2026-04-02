@@ -1,13 +1,13 @@
 package com.example.gymclock.ui
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.gymclock.data.*
 import com.example.gymclock.repository.GymClockRepository
 import com.example.gymclock.timer.WorkoutTimer
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.util.Calendar
 
 data class MainUiState(
     val todaySchedule: ScheduleEntity? = null,
@@ -36,7 +36,6 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
     init {
-        android.util.Log.d("MainViewModel", "init called") // DEBUG
         viewModelScope.launch {
             repository.initializeDefaultData()
             loadData()
@@ -44,7 +43,6 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
     }
 
     private fun loadData() {
-        android.util.Log.d("MainViewModel", "loadData called") // DEBUG
         viewModelScope.launch {
             combine(
                 repository.getScheduleForDay(today),
@@ -72,14 +70,12 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
     }
 
     fun updateSchedule(day: String, plan: String) {
-        android.util.Log.d("MainViewModel", "updateSchedule called with day = $day, plan = $plan") // DEBUG
         viewModelScope.launch {
             repository.upsertSchedule(ScheduleEntity(day, plan))
         }
     }
 
     fun updateGoal(day: String, reps: Int, weight: Int) {
-        android.util.Log.d("MainViewModel", "updateGoal called with day = $day, reps = $reps, weight = $weight") // DEBUG
         viewModelScope.launch {
             repository.upsertGoal(GoalEntity(day, reps, weight))
         }
@@ -87,10 +83,9 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
 
     fun addWorkout(day: String, exerciseId: Long, sets: Int, reps: Int, weight: Float, restTime: Int) {
         val normDay = normalizeDay(day)
-        android.util.Log.d("MainViewModel", "addWorkout called with day = $normDay, exerciseId = $exerciseId, sets = $sets, reps = $reps, weight = $weight, restTime = $restTime") // DEBUG
         viewModelScope.launch {
-            val currentWorkouts = _uiState.value.todayWorkouts
-            val orderInWorkout = currentWorkouts.size
+            // Use the target day's workout count for ordering, not today's count.
+            val orderInWorkout = repository.getWorkoutsForDay(normDay).first().size
             val workout = WorkoutEntity(
                 exerciseId = exerciseId,
                 day = normDay,
@@ -101,12 +96,10 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
                 orderInWorkout = orderInWorkout
             )
             repository.insertWorkout(workout)
-            loadData() // Refresh UI state after adding workout
         }
     }
 
     fun completeWorkout(workout: WorkoutWithExercise) {
-        android.util.Log.d("MainViewModel", "completeWorkout called for workoutId = ${workout.id}") // DEBUG
         viewModelScope.launch {
             val updatedWorkout = WorkoutEntity(
                 id = workout.id,
@@ -123,7 +116,7 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
             )
             repository.updateWorkout(updatedWorkout)
 
-            // Log the workout
+            // Log the completed workout for progress tracking
             val log = WorkoutLogEntity(
                 exerciseId = workout.exerciseId,
                 sets = workout.sets,
@@ -135,32 +128,48 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
         }
     }
 
+    fun deleteWorkout(workout: WorkoutWithExercise) {
+        viewModelScope.launch {
+            repository.deleteWorkout(
+                WorkoutEntity(
+                    id = workout.id,
+                    exerciseId = workout.exerciseId,
+                    day = workout.day,
+                    sets = workout.sets,
+                    reps = workout.reps,
+                    weight = workout.weight,
+                    restTimeSeconds = workout.restTimeSeconds,
+                    notes = workout.notes,
+                    orderInWorkout = workout.orderInWorkout,
+                    isCompleted = workout.isCompleted,
+                    completedAt = workout.completedAt
+                )
+            )
+        }
+    }
+
     fun applySplit(splitId: String) {
-        android.util.Log.d("MainViewModel", "applySplit called with splitId = $splitId") // DEBUG
         viewModelScope.launch {
             repository.applySplit(splitId)
-            loadData() // Refresh UI after applying split
+            // Room's reactive flows emit automatically after the insert/delete/update
+            // operations inside applySplit, so an explicit loadData() call is not needed.
         }
     }
 
     fun startRestTimer(seconds: Int, onFinished: () -> Unit) {
-        android.util.Log.d("MainViewModel", "startRestTimer called with seconds = $seconds") // DEBUG
         timer.startTimer(seconds, onFinished)
     }
 
     fun showError(message: String) {
-        android.util.Log.d("MainViewModel", "showError called with message = $message") // DEBUG
         _uiState.value = _uiState.value.copy(errorMessage = message)
     }
 
     fun clearError() {
-        android.util.Log.d("MainViewModel", "clearError called") // DEBUG
         _uiState.value = _uiState.value.copy(errorMessage = null)
     }
 
     fun getWorkoutsForDay(day: String): StateFlow<List<WorkoutWithExercise>> {
         val normDay = normalizeDay(day)
-        android.util.Log.d("MainViewModel", "getWorkoutsForDay called with day = $normDay") // DEBUG
         return repository.getWorkoutsForDay(normDay).stateIn(
             viewModelScope,
             SharingStarted.Lazily,
@@ -170,7 +179,6 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
 
     fun getGoalForDay(day: String): StateFlow<GoalEntity?> {
         val normDay = normalizeDay(day)
-        android.util.Log.d("MainViewModel", "getGoalForDay called with day = $normDay") // DEBUG
         return repository.getGoalForDay(normDay).stateIn(
             viewModelScope,
             SharingStarted.Lazily,
@@ -180,7 +188,6 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
 
     fun getScheduleForDay(day: String): StateFlow<ScheduleEntity?> {
         val normDay = normalizeDay(day)
-        android.util.Log.d("MainViewModel", "getScheduleForDay called with day = $normDay") // DEBUG
         return repository.getScheduleForDay(normDay).stateIn(
             viewModelScope,
             SharingStarted.Lazily,
@@ -190,11 +197,10 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
 
     fun addCustomExerciseAndWorkout(day: String, exercise: ExerciseEntity, sets: Int, reps: Int, weight: Float, restTime: Int) {
         val normDay = normalizeDay(day)
-        android.util.Log.d("MainViewModel", "addCustomExerciseAndWorkout called with day = $normDay, exercise = ${exercise.name}, sets = $sets, reps = $reps, weight = $weight, restTime = $restTime") // DEBUG
         viewModelScope.launch {
             val exerciseId = repository.insertExercise(exercise)
-            val currentWorkouts = _uiState.value.todayWorkouts
-            val orderInWorkout = currentWorkouts.size
+            // Use the target day's workout count for ordering, not today's count.
+            val orderInWorkout = repository.getWorkoutsForDay(normDay).first().size
             val workout = WorkoutEntity(
                 exerciseId = exerciseId,
                 day = normDay,
@@ -205,7 +211,27 @@ class MainViewModel(private val repository: GymClockRepository) : ViewModel() {
                 orderInWorkout = orderInWorkout
             )
             repository.insertWorkout(workout)
-            loadData()
         }
     }
+
+    /** Returns the most recent workout log entries for the progress screen. */
+    fun getRecentWorkoutLogs(): StateFlow<List<WorkoutLogEntity>> {
+        return repository.getRecentWorkoutLogs().stateIn(
+            viewModelScope,
+            SharingStarted.Lazily,
+            emptyList()
+        )
+    }
 }
+
+/** Factory that lets [ViewModelProvider] construct [MainViewModel] with its dependency. */
+class MainViewModelFactory(private val repository: GymClockRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return MainViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+}
+
