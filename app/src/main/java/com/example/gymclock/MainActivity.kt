@@ -3,6 +3,7 @@ package com.example.gymclock
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,22 +16,23 @@ import androidx.navigation.compose.rememberNavController
 import com.example.gymclock.data.*
 import com.example.gymclock.repository.GymClockRepository
 import com.example.gymclock.ui.MainViewModel
+import com.example.gymclock.ui.MainViewModelFactory
 import com.example.gymclock.ui.navigation.Screen
 import com.example.gymclock.ui.screens.*
 
 class MainActivity : ComponentActivity() {
-    private lateinit var db: GymClockDatabase
-    private lateinit var repository: GymClockRepository
-    private lateinit var viewModel: MainViewModel
+
+    // ViewModelProvider (via activity-viewModels delegate) scopes the ViewModel
+    // to the Activity lifecycle and survives configuration changes such as
+    // screen rotation — previously the ViewModel was constructed manually in
+    // onCreate, recreating it (and re-loading the DB) on every rotation.
+    private val viewModel: MainViewModel by viewModels {
+        val db = GymClockDatabase.getInstance(this)
+        MainViewModelFactory(GymClockRepository(db.gymClockDao()))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Initialize database and repository
-        db = GymClockDatabase.getInstance(this)
-        repository = GymClockRepository(db.gymClockDao())
-        viewModel = MainViewModel(repository)
-
         setContent {
             GymClockApp(viewModel)
         }
@@ -85,6 +87,15 @@ fun GymClockApp(viewModel: MainViewModel) {
                             navController.navigate(Screen.Splits.route)
                         }
                     )
+
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
+                        label = { Text("Progress") },
+                        selected = currentRoute == Screen.Progress.route,
+                        onClick = {
+                            navController.navigate(Screen.Progress.route)
+                        }
+                    )
                 }
             }
         ) { paddingValues ->
@@ -118,6 +129,13 @@ fun GymClockApp(viewModel: MainViewModel) {
 
                 composable(Screen.Splits.route) {
                     SplitsScreen(
+                        viewModel = viewModel,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable(Screen.Progress.route) {
+                    ProgressScreen(
                         viewModel = viewModel,
                         onNavigateBack = { navController.popBackStack() }
                     )

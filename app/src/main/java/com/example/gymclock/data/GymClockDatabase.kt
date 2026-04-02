@@ -15,7 +15,7 @@ import androidx.room.RoomDatabase
         PredefinedSplitEntity::class,
         SplitTemplateEntity::class
     ],
-    version = 2
+    version = 3
 )
 abstract class GymClockDatabase : RoomDatabase() {
     abstract fun gymClockDao(): GymClockDao

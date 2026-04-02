@@ -23,56 +23,62 @@ fun SplitsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showApplyDialog by remember { mutableStateOf<PredefinedSplitEntity?>(null) }
-    var showSnackbar by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    var pendingSnackbar by remember { mutableStateOf<String?>(null) }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Top App Bar
-        TopAppBar(
-            title = { Text("Workout Splits") },
-            navigationIcon = {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                }
-            }
-        )
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
-                Text(
-                    "Popular Workout Splits",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    "Choose a proven split from The Fitness Wiki",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-
-            items(uiState.predefinedSplits) { split ->
-                SplitCard(
-                    split = split,
-                    onApply = { showApplyDialog = split }
-                )
-            }
+    // Show snackbar whenever a message is enqueued
+    if (pendingSnackbar != null) {
+        LaunchedEffect(pendingSnackbar) {
+            snackbarHostState.showSnackbar(pendingSnackbar!!)
+            pendingSnackbar = null
         }
     }
 
-    // Show snackbar message if exists
-    if (showSnackbar != null) {
-        LaunchedEffect(showSnackbar) {
-            snackbarHostState.showSnackbar(showSnackbar!!)
-            showSnackbar = null
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // Top App Bar
+            TopAppBar(
+                title = { Text("Workout Splits") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Text(
+                        "Popular Workout Splits",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Choose a proven split from The Fitness Wiki",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                items(uiState.predefinedSplits) { split ->
+                    SplitCard(
+                        split = split,
+                        onApply = { showApplyDialog = split }
+                    )
+                }
+            }
         }
     }
 
@@ -96,7 +102,7 @@ fun SplitsScreen(
                     onClick = {
                         viewModel.applySplit(split.id)
                         showApplyDialog = null
-                        showSnackbar = "Split applied!"
+                        pendingSnackbar = "${split.name} applied!"
                     }
                 ) {
                     Text("Apply Split")

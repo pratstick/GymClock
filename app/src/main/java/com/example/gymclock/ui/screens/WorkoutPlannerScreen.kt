@@ -27,72 +27,76 @@ fun WorkoutPlannerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAddExerciseDialog by remember { mutableStateOf(false) }
-    var selectedDay by remember { mutableStateOf("Monday") }
+    var selectedDay by remember { mutableStateOf(getCurrentDay()) }
     val snackbarHostState = remember { SnackbarHostState() }
-    var showSnackbar by remember { mutableStateOf<String?>(null) }
-    // Get the plan for the selected day from the schedule
-    val schedule by viewModel.getScheduleForDay(selectedDay).collectAsState(initial = null)
-    val plan = (schedule?.plan ?: selectedDay).lowercase() // always use lowercase for plan/day
-    // Get workouts for the plan (e.g., Push, Pull, Legs)
-    val workoutsForPlan by viewModel.getWorkoutsForDay(plan).collectAsState(initial = emptyList())
+    var pendingSnackbar by remember { mutableStateOf<String?>(null) }
     val goalForDay by viewModel.getGoalForDay(selectedDay).collectAsState(initial = null)
-    // Get workouts for the selected day (not plan)
     val workoutsForSelectedDay by viewModel.getWorkoutsForDay(selectedDay).collectAsState(initial = emptyList())
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        TopAppBar(
-            title = { Text("Workout Planner") },
-            navigationIcon = {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-            }
-        )
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Day Selector
-            item {
-                DaySelector(
-                    selectedDay = selectedDay,
-                    onDaySelected = { selectedDay = it }
-                )
-            }
-
-            // Today's Workouts
-            item {
-                TodaysWorkoutsCard(
-                    day = selectedDay, // show workouts for the selected day, not the plan
-                    workouts = workoutsForSelectedDay,
-                    onAddExercise = { showAddExerciseDialog = true },
-                    onCompleteWorkout = { viewModel.completeWorkout(it) }
-                )
-            }
-
-            // Quick Goals Setting
-            item {
-                QuickGoalsCard(
-                    selectedDay = selectedDay,
-                    currentGoal = goalForDay,
-                    onUpdateGoal = { reps, weight ->
-                        viewModel.updateGoal(selectedDay, reps, weight)
-                    }
-                )
-            }
+    // Show snackbar whenever a message is enqueued
+    if (pendingSnackbar != null) {
+        LaunchedEffect(pendingSnackbar) {
+            snackbarHostState.showSnackbar(pendingSnackbar!!)
+            pendingSnackbar = null
         }
     }
 
-    // Show snackbar message if exists
-    if (showSnackbar != null) {
-        LaunchedEffect(showSnackbar) {
-            snackbarHostState.showSnackbar(showSnackbar!!)
-            showSnackbar = null
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            TopAppBar(
+                title = { Text("Workout Planner") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Day Selector
+                item {
+                    DaySelector(
+                        selectedDay = selectedDay,
+                        onDaySelected = { selectedDay = it }
+                    )
+                }
+
+                // Today's Workouts
+                item {
+                    TodaysWorkoutsCard(
+                        day = selectedDay,
+                        workouts = workoutsForSelectedDay,
+                        onAddExercise = { showAddExerciseDialog = true },
+                        onCompleteWorkout = { viewModel.completeWorkout(it) },
+                        onDeleteWorkout = { workout ->
+                            viewModel.deleteWorkout(workout)
+                            pendingSnackbar = "${workout.exerciseName} removed"
+                        }
+                    )
+                }
+
+                // Quick Goals Setting
+                item {
+                    QuickGoalsCard(
+                        selectedDay = selectedDay,
+                        currentGoal = goalForDay,
+                        onUpdateGoal = { reps, weight ->
+                            viewModel.updateGoal(selectedDay, reps, weight)
+                        }
+                    )
+                }
+            }
         }
     }
 
@@ -102,11 +106,10 @@ fun WorkoutPlannerScreen(
             exercises = uiState.allExercises,
             onDismiss = { showAddExerciseDialog = false },
             onAddExercise = { exercise, sets, reps, weight, restTime, isCustom ->
-                android.util.Log.d("WorkoutPlannerScreen", "onAddExercise called: exercise=${exercise.name}, sets=$sets, reps=$reps, weight=$weight, restTime=$restTime, isCustom=$isCustom")
                 if (isCustom) viewModel.addCustomExerciseAndWorkout(selectedDay, exercise, sets, reps, weight, restTime)
                 else viewModel.addWorkout(selectedDay, exercise.id, sets, reps, weight, restTime)
                 showAddExerciseDialog = false
-                showSnackbar = if (isCustom) "Custom exercise added!" else "Exercise added!"
+                pendingSnackbar = if (isCustom) "Custom exercise added!" else "Exercise added!"
             }
         )
     }
@@ -156,7 +159,8 @@ fun TodaysWorkoutsCard(
     day: String,
     workouts: List<com.example.gymclock.data.WorkoutWithExercise>,
     onAddExercise: () -> Unit,
-    onCompleteWorkout: (com.example.gymclock.data.WorkoutWithExercise) -> Unit
+    onCompleteWorkout: (com.example.gymclock.data.WorkoutWithExercise) -> Unit,
+    onDeleteWorkout: (com.example.gymclock.data.WorkoutWithExercise) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth()
@@ -197,7 +201,8 @@ fun TodaysWorkoutsCard(
                 workouts.forEach { workout ->
                     WorkoutItemCard(
                         workout = workout,
-                        onComplete = { onCompleteWorkout(workout) }
+                        onComplete = { onCompleteWorkout(workout) },
+                        onDelete = { onDeleteWorkout(workout) }
                     )
                     if (workout != workouts.last()) {
                         Spacer(Modifier.height(8.dp))
@@ -211,7 +216,8 @@ fun TodaysWorkoutsCard(
 @Composable
 fun WorkoutItemCard(
     workout: com.example.gymclock.data.WorkoutWithExercise,
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -253,6 +259,14 @@ fun WorkoutItemCard(
                 IconButton(onClick = onComplete) {
                     Icon(Icons.Default.Check, contentDescription = "Mark complete")
                 }
+            }
+            // Delete button — always visible so the user can remove any workout entry
+            IconButton(onClick = onDelete) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Delete workout",
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
         }
     }

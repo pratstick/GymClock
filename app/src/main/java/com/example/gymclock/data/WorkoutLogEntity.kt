@@ -1,8 +1,9 @@
 package com.example.gymclock.data
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import androidx.room.ForeignKey
+import androidx.room.Index
+import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "workout_log",
@@ -13,7 +14,10 @@ import androidx.room.ForeignKey
             childColumns = ["exerciseId"],
             onDelete = ForeignKey.CASCADE
         )
-    ]
+    ],
+    // Index on exerciseId satisfies Room's FK index requirement and speeds
+    // up per-exercise history look-ups.
+    indices = [Index(value = ["exerciseId"])]
 )
 data class WorkoutLogEntity(
     @PrimaryKey(autoGenerate = true)

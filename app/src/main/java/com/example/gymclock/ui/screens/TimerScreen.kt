@@ -132,6 +132,20 @@ fun MainTimerDisplay(
 
             Spacer(Modifier.height(16.dp))
 
+            // Progress bar showing elapsed/remaining time at a glance
+            if (timerState.totalSeconds > 0 && (timerState.isRunning || timerState.isPaused)) {
+                val progress = timerState.currentSeconds.toFloat() / timerState.totalSeconds.toFloat()
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = when {
+                        timerState.isPaused -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.primary
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+
             // Large Timer Display
             Text(
                 formatTime(timerState.currentSeconds),

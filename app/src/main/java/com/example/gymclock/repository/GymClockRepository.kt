@@ -20,13 +20,14 @@ class GymClockRepository(private val dao: GymClockDao) {
     suspend fun insertExercise(exercise: ExerciseEntity) = dao.insertExercise(exercise)
 
     // Workout operations
-    fun getWorkoutsForDay(day: String): Flow<List<WorkoutWithExercise>> = dao.getWorkoutsWithExerciseForDay(day.lowercase())
+    fun getWorkoutsForDay(day: String): Flow<List<WorkoutWithExercise>> = dao.getWorkoutsWithExerciseForDay(day)
     suspend fun insertWorkout(workout: WorkoutEntity) = dao.insertWorkout(workout)
     suspend fun updateWorkout(workout: WorkoutEntity) = dao.updateWorkout(workout)
     suspend fun deleteWorkout(workout: WorkoutEntity) = dao.deleteWorkout(workout)
 
     // Workout log operations
     fun getWorkoutLogsForExercise(exerciseId: Long): Flow<List<WorkoutLogEntity>> = dao.getWorkoutLogsForExercise(exerciseId)
+    fun getRecentWorkoutLogs(): Flow<List<WorkoutLogEntity>> = dao.getRecentWorkoutLogs()
     suspend fun insertWorkoutLog(log: WorkoutLogEntity) = dao.insertWorkoutLog(log)
 
     // Predefined splits
@@ -214,9 +215,7 @@ class GymClockRepository(private val dao: GymClockDao) {
     suspend fun applySplit(splitId: String) {
         // 1. Get all split templates for this split
         val templates = dao.getSplitTemplate(splitId).first()
-        android.util.Log.d("GymClockRepository", "applySplit: templates size = ${templates.size}")
         if (templates.isEmpty()) {
-            android.util.Log.w("GymClockRepository", "applySplit: No templates found for splitId = $splitId")
             return
         }
         // 2. Delete all existing workouts for the week
@@ -239,8 +238,9 @@ class GymClockRepository(private val dao: GymClockDao) {
                 ))
             }
         }
-        // 3. For each template, find the exercise and insert a new workout for the correct day
-        var insertedCount = 0
+        // 3. Update the weekly schedule so home/planner cards reflect the new split
+        applySplitToSchedule(splitId)
+        // 4. For each template, find the exercise and insert a new workout for the correct day
         for (template in templates) {
             val exercise = getExerciseByName(template.exerciseName)
             if (exercise != null) {
@@ -253,7 +253,7 @@ class GymClockRepository(private val dao: GymClockDao) {
                     exerciseId = exercise.id,
                     sets = sets,
                     reps = reps,
-                    weight = if (exercise.isBodyweight == true) 0f else 50f,
+                    weight = if (exercise.isBodyweight) 0f else 50f,
                     restTimeSeconds = template.restTime,
                     isCompleted = false,
                     orderInWorkout = template.orderInDay,
@@ -261,11 +261,7 @@ class GymClockRepository(private val dao: GymClockDao) {
                     completedAt = null
                 )
                 dao.insertWorkout(workout)
-                insertedCount++
-            } else {
-                android.util.Log.w("GymClockRepository", "applySplit: Exercise not found for name = ${template.exerciseName}")
             }
         }
-        android.util.Log.d("GymClockRepository", "applySplit: Inserted $insertedCount workouts for splitId = $splitId")
     }
 }
